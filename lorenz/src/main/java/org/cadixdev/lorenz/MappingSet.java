@@ -33,6 +33,7 @@ import org.cadixdev.bombe.type.Type;
 import org.cadixdev.lorenz.impl.MappingSetImpl;
 import org.cadixdev.lorenz.merge.MappingSetMerger;
 import org.cadixdev.lorenz.model.ClassMapping;
+import org.cadixdev.lorenz.model.InnerClassMapping;
 import org.cadixdev.lorenz.model.TopLevelClassMapping;
 import org.cadixdev.lorenz.model.jar.CascadingFieldTypeProvider;
 import org.cadixdev.lorenz.model.jar.FieldTypeProvider;
@@ -151,6 +152,22 @@ public interface MappingSet extends Reversible<MappingSet, MappingSet> {
                 // Get and return the inner class
                 .flatMap(parentClassMapping -> parentClassMapping.getInnerClassMapping(innerClassName));
     }
+
+    /**
+     * Remove the class mapping for the given obfuscated name.
+     *
+     * @param obfuscatedName The class name to remove.
+     */
+    default void removeClassMapping(final String obfuscatedName) {
+        this.getClassMapping(obfuscatedName).ifPresent(this::removeClassMapping);
+    }
+
+    /**
+     * Remove the given {@link ClassMapping}.
+     *
+     * @param mapping The mapping to remove.
+     */
+    void removeClassMapping(final ClassMapping<?, ?> mapping);
 
     /**
      * Attempts to locate a class mapping for the given obfuscated name.

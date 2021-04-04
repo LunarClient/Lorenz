@@ -27,6 +27,8 @@ package org.cadixdev.lorenz.impl;
 
 import org.cadixdev.lorenz.MappingSet;
 import org.cadixdev.lorenz.MappingSetModelFactory;
+import org.cadixdev.lorenz.model.ClassMapping;
+import org.cadixdev.lorenz.model.InnerClassMapping;
 import org.cadixdev.lorenz.model.TopLevelClassMapping;
 import org.cadixdev.lorenz.model.jar.CascadingFieldTypeProvider;
 
@@ -87,6 +89,14 @@ public class MappingSetImpl implements MappingSet {
     @Override
     public CascadingFieldTypeProvider getFieldTypeProvider() {
         return this.fieldTypeProvider;
+    }
+
+    public void removeClassMapping(final ClassMapping<?, ?> mapping) {
+        if (mapping instanceof InnerClassMapping) {
+            ((InnerClassMapping) mapping).getParent().removeInnerClassMapping(mapping);
+        } else {
+            this.topLevelClasses.values().remove(mapping);
+        }
     }
 
 }
