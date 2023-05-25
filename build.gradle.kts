@@ -1,9 +1,11 @@
+import com.google.cloud.artifactregistry.gradle.plugin.ArtifactRegistryGradlePlugin
 import org.cadixdev.gradle.licenser.Licenser
 import org.cadixdev.gradle.licenser.LicenseExtension
 
 plugins {
     `java-library`
     id("org.cadixdev.licenser") version "0.5.0" apply false
+    id("com.google.cloud.artifactregistry.gradle-plugin") version "2.2.0" apply false
 }
 
 val projectName: String by project
@@ -22,6 +24,7 @@ subprojects {
     apply<JavaLibraryPlugin>()
     apply<MavenPublishPlugin>()
     apply<Licenser>()
+    apply<ArtifactRegistryGradlePlugin>()
 
     repositories {
         mavenCentral()
@@ -114,14 +117,8 @@ subprojects {
         }
 
         repositories {
-            val url = if (isSnapshot) {
-                "https://oss.sonatype.org/content/repositories/snapshots/"
-            } else {
-                "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-            }
-            maven(url) {
-                credentials(PasswordCredentials::class)
-                name = "ossrh"
+            maven {
+                url = uri("artifactregistry://us-maven.pkg.dev/moonsworth-299m4oir/maven-public")
             }
         }
     }
