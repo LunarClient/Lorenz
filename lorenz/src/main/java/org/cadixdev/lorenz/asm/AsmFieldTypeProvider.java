@@ -23,44 +23,49 @@
  * THE SOFTWARE.
  */
 
-package org.cadixdev.lorenz.asm.test;
+package org.cadixdev.lorenz.asm;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import org.cadixdev.lorenz.MappingSet;
-import org.cadixdev.lorenz.asm.AsmFieldTypeProvider;
 import org.cadixdev.lorenz.model.FieldMapping;
+import org.cadixdev.lorenz.model.jar.FieldTypeProvider;
+import org.cadixdev.bombe.provider.ClassProvider;
 import org.cadixdev.bombe.type.FieldType;
-import org.cadixdev.bombe.type.ObjectType;
-import org.junit.jupiter.api.Test;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
 
 import java.util.Objects;
 import java.util.Optional;
 
-public final class AsmFieldTypeProviderTest {
+/**
+ * An implementation of {@link FieldTypeProvider} backed by a
+ * {@link ClassProvider}.
+ *
+ * @author Jamie Mansfield
+ * @since 0.4.0
+ */
+public class AsmFieldTypeProvider implements FieldTypeProvider {
 
-    @Test
-    public void fetchFieldType() {
-        final MappingSet mappings = MappingSet.create();
-        final FieldMapping field = mappings.getOrCreateTopLevelClassMapping("ght")
-                .getOrCreateFieldMapping("op");
+    private final ClassProvider classProvider;
 
-        final ClassWriter writer = new ClassWriter(0);
-        writer.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC, "ght", null, "java/lang/Object", null);
-        writer.visitField(Opcodes.ACC_PUBLIC, "op", "Ljava/util/logging/Logger;", null, null);
+    public AsmFieldTypeProvider(final ClassProvider classProvider) {
+        this.classProvider = classProvider;
+    }
 
-        mappings.addFieldTypeProvider(new AsmFieldTypeProvider(klass -> {
-            if (Objects.equals("ght", klass)) return writer.toByteArray();
-            return null;
-        }));
+    @Override
+    public Optional<FieldType> provide(final FieldMapping mapping) {
+        final String owner = mapping.getParent().getFullObfuscatedName();
 
-        final Optional<FieldType> type = field.getType();
-        assertTrue(type.isPresent());
-        assertTrue(type.get() instanceof ObjectType);
-        assertEquals("java/util/logging/Logger", ((ObjectType) type.get()).getClassName());
+        final ClassNode node = this.classProvider.getAsNode(owner);
+        if (node == null) return Optional.empty();
+
+        final Optional<FieldNode> fieldNode = node.fields.stream()
+                .filter(field -> Objects.equals(field.name, mapping.getObfuscatedName()))
+                .findAny();
+        if (fieldNode.isPresent()) {
+            final FieldType type = FieldType.of(fieldNode.get().desc);
+            return Optional.of(type);
+        }
+
+        return Optional.empty();
     }
 
 }

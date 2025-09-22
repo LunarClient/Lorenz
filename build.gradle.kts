@@ -17,7 +17,7 @@ val isSnapshot = version.toString().endsWith("-SNAPSHOT")
 
 allprojects {
     group = "org.cadixdev"
-    version = "0.5.10-SNAPSHOT"
+    version = "0.5.11"
 }
 
 subprojects {
@@ -28,8 +28,9 @@ subprojects {
 
     repositories {
         mavenCentral()
-        if (bombeVersion.endsWith("-SNAPSHOT")) {
-            maven("https://oss.sonatype.org/content/groups/public/")
+
+        maven {
+            url = uri("artifactregistry://us-maven.pkg.dev/mw-lunarclient-maven-repo/virtual")
         }
     }
 
