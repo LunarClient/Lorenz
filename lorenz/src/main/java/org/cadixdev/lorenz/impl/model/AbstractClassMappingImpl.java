@@ -60,10 +60,10 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
         extends AbstractMappingImpl<M, P>
         implements ClassMapping<M, P> {
 
-    private final Map<FieldSignature, FieldMapping> fields = new ConcurrentHashMap<>();
-    private final Map<String, FieldMapping> fieldsByName = new ConcurrentHashMap<>();
-    private final Map<MethodSignature, MethodMapping> methods = new ConcurrentHashMap<>();
-    private final Map<String, InnerClassMapping> innerClasses = new ConcurrentHashMap<>();
+    private volatile Map<FieldSignature, FieldMapping> fields;
+    private volatile Map<String, FieldMapping> fieldsByName;
+    private volatile Map<MethodSignature, MethodMapping> methods;
+    private volatile Map<String, InnerClassMapping> innerClasses;
     private boolean complete;
 
     /**
@@ -77,24 +77,72 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
         super(mappings, obfuscatedName, deobfuscatedName);
     }
 
+    private Map<FieldSignature, FieldMapping> fieldMap() {
+        Map<FieldSignature, FieldMapping> f = this.fields;
+        if (f == null) {
+            synchronized (this) {
+                f = this.fields;
+                if (f == null) this.fields = f = new ConcurrentHashMap<>();
+            }
+        }
+        return f;
+    }
+
+    private Map<String, FieldMapping> fieldsByNameMap() {
+        Map<String, FieldMapping> f = this.fieldsByName;
+        if (f == null) {
+            synchronized (this) {
+                f = this.fieldsByName;
+                if (f == null) this.fieldsByName = f = new ConcurrentHashMap<>();
+            }
+        }
+        return f;
+    }
+
+    private Map<MethodSignature, MethodMapping> methodMap() {
+        Map<MethodSignature, MethodMapping> m = this.methods;
+        if (m == null) {
+            synchronized (this) {
+                m = this.methods;
+                if (m == null) this.methods = m = new ConcurrentHashMap<>();
+            }
+        }
+        return m;
+    }
+
+    private Map<String, InnerClassMapping> innerClassMap() {
+        Map<String, InnerClassMapping> i = this.innerClasses;
+        if (i == null) {
+            synchronized (this) {
+                i = this.innerClasses;
+                if (i == null) this.innerClasses = i = new ConcurrentHashMap<>();
+            }
+        }
+        return i;
+    }
+
     @Override
     public Collection<FieldMapping> getFieldMappings() {
-        return Collections.unmodifiableCollection(this.fields.values());
+        final Map<FieldSignature, FieldMapping> f = this.fields;
+        return f == null ? Collections.emptyList() : Collections.unmodifiableCollection(f.values());
     }
 
     @Override
     public Map<String, FieldMapping> getFieldsByName() {
-        return Collections.unmodifiableMap(this.fieldsByName);
+        final Map<String, FieldMapping> f = this.fieldsByName;
+        return f == null ? Collections.emptyMap() : Collections.unmodifiableMap(f);
     }
 
     @Override
     public Optional<FieldMapping> getFieldMapping(final FieldSignature signature) {
-        return Optional.ofNullable(this.fields.get(signature));
+        final Map<FieldSignature, FieldMapping> f = this.fields;
+        return f == null ? Optional.empty() : Optional.ofNullable(f.get(signature));
     }
 
     @Override
     public Optional<FieldMapping> getFieldMapping(final String obfuscatedName) {
-        return Optional.ofNullable(this.fieldsByName.get(obfuscatedName));
+        final Map<String, FieldMapping> f = this.fieldsByName;
+        return f == null ? Optional.empty() : Optional.ofNullable(f.get(obfuscatedName));
     }
 
     @Override
@@ -106,8 +154,9 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
 
         // Otherwise, look up the signature as-is, but attempt falling back to a signature without type
         // Note: We cannot use fieldsByName here, because we'd eventually return FieldMappings with the wrong type
-        return Optional.ofNullable(this.fields.computeIfAbsent(signature, (sig) -> {
-            final FieldMapping mapping = this.fields.get(new FieldSignature(sig.getName()));
+        final Map<FieldSignature, FieldMapping> f = this.fieldMap();
+        return Optional.ofNullable(f.computeIfAbsent(signature, (sig) -> {
+            final FieldMapping mapping = f.get(new FieldSignature(sig.getName()));
             return mapping != null ?
                     this.getMappings().getModelFactory().createFieldMapping(mapping.getParent(), sig, mapping.getDeobfuscatedName()) : null;
         }));
@@ -115,10 +164,10 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
 
     @Override
     public FieldMapping createFieldMapping(final FieldSignature signature, final String deobfuscatedName) {
-        return this.fields.compute(signature, (sig, existingMapping) -> {
+        return this.fieldMap().compute(signature, (sig, existingMapping) -> {
             if (existingMapping != null) return existingMapping.setDeobfuscatedName(deobfuscatedName);
             final FieldMapping mapping = this.getMappings().getModelFactory().createFieldMapping(this, sig, deobfuscatedName);
-            this.fieldsByName.put(sig.getName(), mapping);
+            this.fieldsByNameMap().put(sig.getName(), mapping);
             return mapping;
         });
     }
@@ -130,42 +179,47 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
 
     @Override
     public boolean hasFieldMapping(final String obfuscatedName) {
-        return this.fieldsByName.containsKey(obfuscatedName);
+        final Map<String, FieldMapping> f = this.fieldsByName;
+        return f != null && f.containsKey(obfuscatedName);
     }
 
     @Override
     public void removeFieldMapping(final FieldSignature signature) {
-        final FieldMapping mapping = this.fields.remove(signature);
-        if (mapping != null) {
+        final Map<FieldSignature, FieldMapping> f = this.fields;
+        if (f == null) return;
+        final FieldMapping mapping = f.remove(signature);
+        if (mapping != null && this.fieldsByName != null) {
             this.fieldsByName.values().remove(mapping);
         }
     }
 
     @Override
     public void removeFieldMapping(final FieldMapping mapping) {
-        this.fields.values().remove(mapping);
-        this.fieldsByName.values().remove(mapping);
+        if (this.fields != null) this.fields.values().remove(mapping);
+        if (this.fieldsByName != null) this.fieldsByName.values().remove(mapping);
     }
 
     @Override
     public void removeFieldMapping(final String obfuscatedName) {
-        this.fields.keySet().removeIf(sig -> sig.getName().equals(obfuscatedName));
-        this.fieldsByName.remove(obfuscatedName);
+        if (this.fields != null) this.fields.keySet().removeIf(sig -> sig.getName().equals(obfuscatedName));
+        if (this.fieldsByName != null) this.fieldsByName.remove(obfuscatedName);
     }
 
     @Override
     public Collection<MethodMapping> getMethodMappings() {
-        return Collections.unmodifiableCollection(this.methods.values());
+        final Map<MethodSignature, MethodMapping> m = this.methods;
+        return m == null ? Collections.emptyList() : Collections.unmodifiableCollection(m.values());
     }
 
     @Override
     public Optional<MethodMapping> getMethodMapping(final MethodSignature signature) {
-        return Optional.ofNullable(this.methods.get(signature));
+        final Map<MethodSignature, MethodMapping> m = this.methods;
+        return m == null ? Optional.empty() : Optional.ofNullable(m.get(signature));
     }
 
     @Override
     public MethodMapping createMethodMapping(final MethodSignature signature, final String deobfuscatedName) {
-        return this.methods.compute(signature, (desc, existingMapping) -> {
+        return this.methodMap().compute(signature, (desc, existingMapping) -> {
             if (existingMapping != null) return existingMapping.setDeobfuscatedName(deobfuscatedName);
             return this.getMappings().getModelFactory().createMethodMapping(this, signature, deobfuscatedName);
         });
@@ -173,32 +227,35 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
 
     @Override
     public boolean hasMethodMapping(final MethodSignature signature) {
-        return this.methods.containsKey(signature);
+        final Map<MethodSignature, MethodMapping> m = this.methods;
+        return m != null && m.containsKey(signature);
     }
 
     @Override
     public void removeMethodMapping(final MethodSignature signature) {
-        this.methods.remove(signature);
+        if (this.methods != null) this.methods.remove(signature);
     }
 
     @Override
     public void removeMethodMapping(final MethodMapping mapping) {
-        this.methods.values().remove(mapping);
+        if (this.methods != null) this.methods.values().remove(mapping);
     }
 
     @Override
     public Collection<InnerClassMapping> getInnerClassMappings() {
-        return Collections.unmodifiableCollection(this.innerClasses.values());
+        final Map<String, InnerClassMapping> i = this.innerClasses;
+        return i == null ? Collections.emptyList() : Collections.unmodifiableCollection(i.values());
     }
 
     @Override
     public Optional<InnerClassMapping> getInnerClassMapping(final String obfuscatedName) {
-        return Optional.ofNullable(this.innerClasses.get(obfuscatedName));
+        final Map<String, InnerClassMapping> i = this.innerClasses;
+        return i == null ? Optional.empty() : Optional.ofNullable(i.get(obfuscatedName));
     }
 
     @Override
     public InnerClassMapping createInnerClassMapping(final String obfuscatedName, final String deobfuscatedName) {
-        return this.innerClasses.compute(obfuscatedName, (name, existingMapping) -> {
+        return this.innerClassMap().compute(obfuscatedName, (name, existingMapping) -> {
             if (existingMapping != null) return existingMapping.setDeobfuscatedName(deobfuscatedName);
             return this.getMappings().getModelFactory().createInnerClassMapping(this, obfuscatedName, deobfuscatedName);
         });
@@ -206,17 +263,18 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
 
     @Override
     public boolean hasInnerClassMapping(final String obfuscatedName) {
-        return this.innerClasses.containsKey(obfuscatedName);
+        final Map<String, InnerClassMapping> i = this.innerClasses;
+        return i != null && i.containsKey(obfuscatedName);
     }
 
     @Override
     public void removeInnerClassMapping(String obfuscatedName) {
-        this.innerClasses.remove(obfuscatedName);
+        if (this.innerClasses != null) this.innerClasses.remove(obfuscatedName);
     }
 
     @Override
     public void removeInnerClassMapping(final ClassMapping<?, ?> mapping) {
-        this.innerClasses.values().remove(mapping);
+        if (this.innerClasses != null) this.innerClasses.values().remove(mapping);
     }
 
     @Override
@@ -241,7 +299,7 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), this.fields, this.methods, this.innerClasses);
+        return Objects.hash(super.hashCode(), this.getFieldMappings(), this.getMethodMappings(), this.getInnerClassMappings());
     }
 
     @Override
@@ -273,13 +331,13 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
                 }
 
                 if (parent.canInherit(info, mapping.getSignature())) {
-                    this.fields.putIfAbsent(mapping.getSignature(), mapping);
+                    this.fieldMap().putIfAbsent(mapping.getSignature(), mapping);
                 }
             }
 
             for (final MethodMapping mapping : parentMappings.getMethodMappings()) {
                 if (parent.canInherit(info, mapping.getSignature())) {
-                    this.methods.putIfAbsent(mapping.getSignature(), mapping);
+                    this.methodMap().putIfAbsent(mapping.getSignature(), mapping);
                 }
 
                 // Check if there are any methods here that override the return type of a parent
@@ -296,7 +354,7 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
                         if (!Objects.equals(methodDescriptor.getParamTypes(), mappingDescriptor.getParamTypes())) continue;
 
                         if (mappingDescriptor.getReturnType().isAssignableFrom(methodDescriptor.getReturnType(), provider)) {
-                            this.methods.putIfAbsent(methodSignature, mapping);
+                            this.methodMap().putIfAbsent(methodSignature, mapping);
                         }
                     }
                 }

@@ -49,7 +49,7 @@ public class MethodMappingImpl
         implements MethodMapping {
 
     private final MethodSignature signature;
-    private final Map<Integer, MethodParameterMapping> parameters = new ConcurrentHashMap<>();
+    private volatile Map<Integer, MethodParameterMapping> parameters;
 
     /**
      * Creates a new method mapping, from the given parameters.
@@ -68,14 +68,26 @@ public class MethodMappingImpl
         return this.signature;
     }
 
+    private Map<Integer, MethodParameterMapping> parametersMap() {
+        Map<Integer, MethodParameterMapping> p = this.parameters;
+        if (p == null) {
+            synchronized (this) {
+                p = this.parameters;
+                if (p == null) this.parameters = p = new ConcurrentHashMap<>();
+            }
+        }
+        return p;
+    }
+
     @Override
     public Collection<MethodParameterMapping> getParameterMappings() {
-        return Collections.unmodifiableCollection(this.parameters.values());
+        final Map<Integer, MethodParameterMapping> p = this.parameters;
+        return p == null ? Collections.emptyList() : Collections.unmodifiableCollection(p.values());
     }
 
     @Override
     public MethodParameterMapping createParameterMapping(final int index, final String deobfuscatedName) {
-        return this.parameters.compute(index, (i, mapping) -> {
+        return this.parametersMap().compute(index, (i, mapping) -> {
             if (mapping != null) return mapping.setDeobfuscatedName(deobfuscatedName);
             return this.getMappings().getModelFactory().createMethodParameterMapping(this, i, deobfuscatedName);
         });
@@ -83,12 +95,14 @@ public class MethodMappingImpl
 
     @Override
     public Optional<MethodParameterMapping> getParameterMapping(final int index) {
-        return Optional.ofNullable(this.parameters.get(index));
+        final Map<Integer, MethodParameterMapping> p = this.parameters;
+        return p == null ? Optional.empty() : Optional.ofNullable(p.get(index));
     }
 
     @Override
     public boolean hasParameterMapping(final int index) {
-        return this.parameters.containsKey(index);
+        final Map<Integer, MethodParameterMapping> p = this.parameters;
+        return p != null && p.containsKey(index);
     }
 
     @Override
