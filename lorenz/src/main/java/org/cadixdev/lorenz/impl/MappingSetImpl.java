@@ -68,9 +68,13 @@ public class MappingSetImpl implements MappingSet {
         return Collections.unmodifiableCollection(this.topLevelClasses.values());
     }
 
+    private static String toInternalName(final String name) {
+        return name.indexOf('.') < 0 ? name : name.replace('.', '/');
+    }
+
     @Override
     public TopLevelClassMapping createTopLevelClassMapping(final String obfuscatedName, final String deobfuscatedName) {
-        return this.topLevelClasses.compute(obfuscatedName.replace('.', '/'), (name, existingMapping) -> {
+        return this.topLevelClasses.compute(toInternalName(obfuscatedName), (name, existingMapping) -> {
             if (existingMapping != null) return existingMapping.setDeobfuscatedName(deobfuscatedName);
             return this.getModelFactory().createTopLevelClassMapping(this, name, deobfuscatedName);
         });
@@ -78,12 +82,12 @@ public class MappingSetImpl implements MappingSet {
 
     @Override
     public Optional<TopLevelClassMapping> getTopLevelClassMapping(final String obfuscatedName) {
-        return Optional.ofNullable(this.topLevelClasses.get(obfuscatedName.replace('.', '/')));
+        return Optional.ofNullable(this.topLevelClasses.get(toInternalName(obfuscatedName)));
     }
 
     @Override
     public boolean hasTopLevelClassMapping(final String obfuscatedName) {
-        return this.topLevelClasses.containsKey(obfuscatedName.replace('.', '/'));
+        return this.topLevelClasses.containsKey(toInternalName(obfuscatedName));
     }
 
     @Override
