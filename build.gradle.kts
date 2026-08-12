@@ -17,7 +17,7 @@ val isSnapshot = version.toString().endsWith("-SNAPSHOT")
 
 allprojects {
     group = "org.cadixdev"
-    version = "0.5.12"
+    version = "0.5.13"
 }
 
 subprojects {
