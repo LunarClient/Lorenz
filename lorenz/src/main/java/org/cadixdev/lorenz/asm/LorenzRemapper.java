@@ -29,8 +29,7 @@ import org.cadixdev.lorenz.MappingSet;
 import org.cadixdev.lorenz.model.ClassMapping;
 import org.cadixdev.lorenz.model.Mapping;
 import org.cadixdev.bombe.analysis.InheritanceProvider;
-import org.cadixdev.bombe.type.signature.FieldSignature;
-import org.cadixdev.bombe.type.signature.MethodSignature;
+import org.cadixdev.lorenz.util.Signatures;
 import org.objectweb.asm.commons.Remapper;
 
 /**
@@ -77,7 +76,7 @@ public class LorenzRemapper extends Remapper {
     @Override
     public String mapFieldName(final String owner, final String name, final String desc) {
         return this.getCompletedClassMapping(owner)
-                .computeFieldMapping(FieldSignature.of(name, desc))
+                .computeFieldMapping(Signatures.field(name, desc))
                 .map(Mapping::getDeobfuscatedName)
                 .orElse(name);
     }
@@ -85,7 +84,7 @@ public class LorenzRemapper extends Remapper {
     @Override
     public String mapMethodName(final String owner, final String name, final String desc) {
         return this.getCompletedClassMapping(owner)
-                .getMethodMapping(MethodSignature.of(name, desc))
+                .getMethodMapping(Signatures.method(name, desc))
                 .map(Mapping::getDeobfuscatedName)
                 .orElse(name);
     }

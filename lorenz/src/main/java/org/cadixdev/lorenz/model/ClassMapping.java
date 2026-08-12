@@ -31,6 +31,7 @@ import org.cadixdev.bombe.type.FieldType;
 import org.cadixdev.bombe.type.MethodDescriptor;
 import org.cadixdev.bombe.type.signature.FieldSignature;
 import org.cadixdev.bombe.type.signature.MethodSignature;
+import org.cadixdev.lorenz.util.Signatures;
 
 import java.util.Collection;
 import java.util.Map;
@@ -234,7 +235,7 @@ public interface ClassMapping<M extends ClassMapping, P> extends Mapping<M, P>, 
      * @since 0.4.0
      */
     default FieldMapping getOrCreateFieldMapping(final String obfuscatedName, final String obfuscatedDescriptor) {
-        return this.getOrCreateFieldMapping(new FieldSignature(obfuscatedName, FieldType.of(obfuscatedDescriptor)));
+        return this.getOrCreateFieldMapping(Signatures.field(obfuscatedName, obfuscatedDescriptor));
     }
 
     /**
@@ -325,7 +326,7 @@ public interface ClassMapping<M extends ClassMapping, P> extends Mapping<M, P>, 
      * @since 0.5.0
      */
     default Optional<MethodMapping> getMethodMapping(final String obfuscatedName, final String obfuscatedDescriptor) {
-        return this.getMethodMapping(MethodSignature.of(obfuscatedName, obfuscatedDescriptor));
+        return this.getMethodMapping(Signatures.method(obfuscatedName, obfuscatedDescriptor));
     }
 
     /**
@@ -358,7 +359,7 @@ public interface ClassMapping<M extends ClassMapping, P> extends Mapping<M, P>, 
      * @return The method mapping
      */
     default MethodMapping createMethodMapping(final String obfuscatedName, final String obfuscatedDescriptor) {
-        return this.createMethodMapping(MethodSignature.of(obfuscatedName, obfuscatedDescriptor));
+        return this.createMethodMapping(Signatures.method(obfuscatedName, obfuscatedDescriptor));
     }
 
     /**
@@ -395,7 +396,7 @@ public interface ClassMapping<M extends ClassMapping, P> extends Mapping<M, P>, 
      * @return The method mapping
      */
     default MethodMapping getOrCreateMethodMapping(final String obfuscatedName, final String obfuscatedDescriptor) {
-        return this.getOrCreateMethodMapping(MethodSignature.of(obfuscatedName, obfuscatedDescriptor));
+        return this.getOrCreateMethodMapping(Signatures.method(obfuscatedName, obfuscatedDescriptor));
     }
 
     /**

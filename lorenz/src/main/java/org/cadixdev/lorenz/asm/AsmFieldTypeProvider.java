@@ -29,6 +29,7 @@ import org.cadixdev.lorenz.model.FieldMapping;
 import org.cadixdev.lorenz.model.jar.FieldTypeProvider;
 import org.cadixdev.bombe.provider.ClassProvider;
 import org.cadixdev.bombe.type.FieldType;
+import org.cadixdev.lorenz.util.Signatures;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 
@@ -61,7 +62,7 @@ public class AsmFieldTypeProvider implements FieldTypeProvider {
                 .filter(field -> Objects.equals(field.name, mapping.getObfuscatedName()))
                 .findAny();
         if (fieldNode.isPresent()) {
-            final FieldType type = FieldType.of(fieldNode.get().desc);
+            final FieldType type = Signatures.fieldType(fieldNode.get().desc);
             return Optional.of(type);
         }
 
