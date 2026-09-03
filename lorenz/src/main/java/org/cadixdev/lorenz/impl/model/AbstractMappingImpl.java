@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.StringJoiner;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
  * An abstract basic implementation of {@link Mapping}.
@@ -46,8 +47,12 @@ import java.util.StringJoiner;
  */
 public abstract class AbstractMappingImpl<M extends Mapping, P> implements Mapping<M, P> {
 
+    @SuppressWarnings("rawtypes")
+    private static final AtomicReferenceFieldUpdater<AbstractMappingImpl, Map> DATA =
+            AtomicReferenceFieldUpdater.newUpdater(AbstractMappingImpl.class, Map.class, "data");
+
     private final MappingSet mappings;
-    private final Map<ExtensionKey<?>, Object> data = new HashMap<>();
+    private volatile Map<ExtensionKey<?>, Object> data;
     private final String obfuscatedName;
     private String deobfuscatedName;
 
@@ -93,11 +98,14 @@ public abstract class AbstractMappingImpl<M extends Mapping, P> implements Mappi
 
     @Override
     public <T> Optional<T> get(final ExtensionKey<T> key) {
-        return Optional.ofNullable(this.data.get(key)).map(key::cast);
+        final Map<ExtensionKey<?>, Object> d = this.data;
+        if (d == null) return Optional.empty();
+        return Optional.ofNullable(d.get(key)).map(key::cast);
     }
 
     @Override
     public <T> void set(final ExtensionKey<T> key, final T value) {
+        if (this.data == null) DATA.compareAndSet(this, null, new HashMap<>(4));
         this.data.put(key, value);
     }
 
